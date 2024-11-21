@@ -1,1 +1,1 @@
-web: gunicorn api.db_setup:app
+web: gunicorn app.db_setup:api

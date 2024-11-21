@@ -63,14 +63,6 @@ def terms_of_services():
     except Exception as e:
         return jsonify(success=False, message=str(e)), 500
 
-# JWT token generator
-def generate_token(user_id):
-    payload = {
-        'user_id': user_id,
-        'exp': datetime.utcnow() + timedelta(days=1)  # Token expires in 1 day
-    }
-    token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
-    return token
 # Simplified token generation
 def generate_token(user_id, is_superuser):
     payload = {

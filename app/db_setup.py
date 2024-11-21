@@ -25,7 +25,7 @@ def get_db_connection():
             charset='utf8mb4',
             cursorclass=pymysql.cursors.DictCursor,
             ssl_ca=SSL_CA_PATH,
-            port = 26534
+            port=int(os.getenv('DB_PORT'))
         )
         print(connection)
         return connection
@@ -46,14 +46,12 @@ def init_db(app):
         with connection.cursor() as cursor:
             cursor.execute('SELECT 1')  # Simple query to check connection
         connection.close()
-        print("Database connection established successfully.")
     except Exception as e:
-        print(f"Database connection failed: {e}")
         raise RuntimeError("Could not connect to the database.") from e
 
 # Create and configure Flask application
 def create_app():
-    app = Flask(__name__, static_folder='../../psy_frontend/build')
+    app = Flask(__name__)
 
     # Configure CORS to allow requests from the specified origin
     allowed_origin = os.getenv('ALLOWED_ORIGIN', 'http://localhost:3000')

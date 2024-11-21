@@ -1,7 +1,7 @@
-from db_setup import get_db_connection
+from .db_setup import get_db_connection
 import logging
 #for superuser password check 
-from self_utils import check_password
+from .self_utils import check_password
 #for simple users check 
 from werkzeug.security import check_password_hash
 import base64

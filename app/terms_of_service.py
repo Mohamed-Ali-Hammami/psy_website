@@ -1,7 +1,7 @@
 from flask import request, jsonify
 import json
 from typing import Dict, Any, Optional
-from db_setup import get_db_connection
+from .db_setup import get_db_connection
 import logging
 class TermsOfServiceManager:
     def __init__(self, connection):

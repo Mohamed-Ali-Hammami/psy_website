@@ -53,9 +53,17 @@ def init_db(app):
 def create_app():
     app = Flask(__name__)
 
-    # Configure CORS to allow requests from the specified origin
-    allowed_origin = os.getenv('ALLOWED_ORIGIN', 'http://localhost:3000')
-    CORS(app, resources={r"/api/*": {"origins": allowed_origin}}, supports_credentials=True, automatic_options=True)
+    # Get the allowed origin from environment variables
+    allowed_origin = os.getenv('ALLOWED_ORIGIN')
+    localhost = 'http://localhost:3000'
+
+    # Configure CORS to allow requests from the allowed origin or localhost
+    if allowed_origin:
+        origins = [allowed_origin, localhost]
+    else:
+        origins = [localhost]
+
+    CORS(app, resources={r"/api/*": {"origins": origins}}, supports_credentials=True, automatic_options=True)
 
     # Initialize Stripe API with the secret key from environment
     stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
@@ -64,3 +72,4 @@ def create_app():
     init_db(app)
 
     return app
+

@@ -1,4 +1,4 @@
-from .db_setup import get_db_connection
+from db_setup import get_db_connection
 import logging
 
 def purchase_product(user_id, product_name, session_id, price):

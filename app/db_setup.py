@@ -25,7 +25,7 @@ def get_db_connection():
             charset='utf8mb4',
             cursorclass=pymysql.cursors.DictCursor,
             ssl_ca=SSL_CA_PATH,
-            port=os.getenv('DB_PORT')
+            port=int(os.getenv('DB_PORT'))
         )
         print(connection)
         return connection

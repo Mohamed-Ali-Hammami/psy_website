@@ -2,7 +2,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from .db_setup import get_db_connection
 from .self_utils import is_valid_email,create_new_password
 from flask import flash, jsonify
-from pymysql.err import IntegrityError
+from mysql.connector import Error as MySQLError
+from mysql.connector import errorcode
 import logging
 import os
 import pymysql
@@ -206,68 +207,82 @@ def get_user_by_email(email):
                 return user,new_password
     finally:
         connection.close()
-        
-# Helper function to register user using the RegisterUser stored procedure
-def register_user(first_name, last_name, username, email, password, phone_number, country, address, profile_picture=None):
-    print(f"Received parameters: first_name={first_name}, last_name={last_name}, username={username}, email={email}, phone_number={phone_number}, country={country}, address={address}")
 
+
+def register_user(first_name, last_name, username, email, password, phone_number, country, address, profile_picture=None):
+    # Initial validations (keep existing checks)
     if not first_name or not last_name or not username or not email or not password or not phone_number or not country:
         return jsonify({"message": "All fields are required."}), 400
 
     if not is_valid_email(email):
-        print(f"Invalid email format: {email}")
         return jsonify({"message": "Invalid email format."}), 400
 
     if len(password) < 6:
-        print("Password is too short. Must be at least 6 characters.")
         return jsonify({"message": "Password must be at least 6 characters long."}), 400
 
     hashed_password = generate_password_hash(password)
-    print(f"Hashed password: {hashed_password}")
 
-    # Load the default profile picture as binary data if no profile picture is provided
+    # Profile picture handling (keep existing logic)
     if profile_picture is None:
         if os.path.exists(DEFAULT_PICTURE_PATH):
-            print(f"Loading default profile picture from {DEFAULT_PICTURE_PATH}")
             with open(DEFAULT_PICTURE_PATH, 'rb') as image_file:
                 profile_picture = image_file.read()
         else:
-            print(f"Default profile picture file not found at {DEFAULT_PICTURE_PATH}")
             return jsonify({"message": "Default profile picture file not found."}), 500
 
-    print("Connecting to database...")
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
-            print("Calling stored procedure 'RegisterUser' with parameters...")
-            cursor.callproc('RegisterUser', (
-                first_name, last_name, username, email, hashed_password,
-                profile_picture, phone_number, country, address
-            ))
+            try:
+                # Call the stored procedure
+                cursor.callproc('RegisterUser', (
+                    first_name, last_name, username, email, hashed_password,
+                    profile_picture, phone_number, country, address
+                ))
 
-            print("Committing changes to the database...")
-            connection.commit()
-            print("User registration successful!")
+                # Fetch any result (if the procedure returns anything)
+                results = list(cursor.stored_results())
+                
+                # Commit the transaction
+                connection.commit()
 
-            return jsonify({
-                "message": "User registered successfully!", 
-                "user": {
-                    "first_name": first_name,
-                    "last_name": last_name,
-                    "username": username,
-                    "email": email
-                }
-            }), 201
-    except IntegrityError as e:
-     connection.rollback()
-     logging.error(f"Database error: {e}")
-     if 'username' in str(e):
-         return jsonify({"message": "Username already taken."}), 400
-     if 'email' in str(e):
-         return jsonify({"message": "Email already in use."}), 400
-     # You can also log the error details
-     logging.error(f"Error details: {str(e)}")
-     return jsonify({"message": "A database error occurred."}), 500
+                return jsonify({
+                    "message": "User registered successfully!", 
+                    "user": {
+                        "first_name": first_name,
+                        "last_name": last_name,
+                        "username": username,
+                        "email": email
+                    }
+                }), 201
+
+            except MySQLError as mysql_err:
+                # Rollback the transaction
+                connection.rollback()
+
+                # Handle specific MySQL error codes
+                if mysql_err.errno == errorcode.ER_DUP_ENTRY:
+                    # Check which unique constraint was violated
+                    error_message = str(mysql_err)
+                    if 'username' in error_message:
+                        return jsonify({"message": "Username already taken."}), 400
+                    elif 'email' in error_message:
+                        return jsonify({"message": "Email already in use."}), 400
+
+                # Handle signal errors from the stored procedure
+                if mysql_err.errno == 1644:  # Custom error number for SIGNAL statements
+                    return jsonify({"message": mysql_err.msg}), 400
+
+                # Log the full error for debugging
+                logging.error(f"MySQL Error: {mysql_err}")
+                return jsonify({"message": "An unexpected database error occurred."}), 500
+
+    except Exception as e:
+        # Catch any other unexpected errors
+        logging.error(f"Unexpected error: {e}")
+        return jsonify({"message": "An unexpected error occurred."}), 500
+
     finally:
-        connection.close()
-
+        # Ensure connection is always closed
+        if connection:
+            connection.close()

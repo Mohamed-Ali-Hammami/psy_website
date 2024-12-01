@@ -2,6 +2,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from .db_setup import get_db_connection
 from .self_utils import is_valid_email,create_new_password
 from flask import flash, jsonify
+from pymysql.err import IntegrityError
 import logging
 import os
 import pymysql
@@ -206,7 +207,6 @@ def get_user_by_email(email):
     finally:
         connection.close()
         
-
 # Helper function to register user using the RegisterUser stored procedure
 def register_user(first_name, last_name, username, email, password, phone_number, country, address, profile_picture=None):
     print(f"Received parameters: first_name={first_name}, last_name={last_name}, username={username}, email={email}, phone_number={phone_number}, country={country}, address={address}")
@@ -237,7 +237,6 @@ def register_user(first_name, last_name, username, email, password, phone_number
 
     print("Connecting to database...")
     connection = get_db_connection()
-
     try:
         with connection.cursor() as cursor:
             print("Calling stored procedure 'RegisterUser' with parameters...")
@@ -259,21 +258,16 @@ def register_user(first_name, last_name, username, email, password, phone_number
                     "email": email
                 }
             }), 201
-    except pymysql.MySQLError as e:  # Catching specific MySQL errors
-        connection.rollback()
-        logging.error(f"Database error: {e}")
-        
-        # Check for specific MySQL error codes or messages
-        if '1062' in str(e):  # Duplicate entry for username or email
-            if 'username' in str(e):
-                return jsonify({"message": "Username already taken."}), 400
-            elif 'email' in str(e):
-                return jsonify({"message": "Email already in use."}), 400
-        return jsonify({"message": "A database error occurred."}), 500
-    except Exception as e:
-        # Catching any other unexpected errors
-        connection.rollback()
-        logging.error(f"Unexpected error: {e}")
-        return jsonify({"message": "An unexpected error occurred."}), 500
+    except IntegrityError as e:
+     connection.rollback()
+     logging.error(f"Database error: {e}")
+     if 'username' in str(e):
+         return jsonify({"message": "Username already taken."}), 400
+     if 'email' in str(e):
+         return jsonify({"message": "Email already in use."}), 400
+     # You can also log the error details
+     logging.error(f"Error details: {str(e)}")
+     return jsonify({"message": "A database error occurred."}), 500
     finally:
         connection.close()
+

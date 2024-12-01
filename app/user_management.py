@@ -212,7 +212,6 @@ def register_user(first_name, last_name, username, email, password, phone_number
     print(f"Received parameters: first_name={first_name}, last_name={last_name}, username={username}, email={email}, phone_number={phone_number}, country={country}, address={address}")
 
     if not first_name or not last_name or not username or not email or not password or not phone_number or not country:
-        print("One or more required fields are missing.")
         return jsonify({"message": "All fields are required."}), 400
 
     if not is_valid_email(email):
@@ -260,18 +259,15 @@ def register_user(first_name, last_name, username, email, password, phone_number
                 }
             }), 201
     except IntegrityError as e:
-        connection.rollback()
-        print(f"Database error: {e}")
-        logging.error(f"Database error: {e}")
-        if 'username' in str(e):
-            print("Username already taken.")
-            return jsonify({"message": "Username already taken."}), 400
-        if 'email' in str(e):
-            print("Email already in use.")
-            return jsonify({"message": "Email already in use."}), 400
-        print("General database error.")
-        return jsonify({"message": "A database error occurred."}), 500
+     connection.rollback()
+     logging.error(f"Database error: {e}")
+     if 'username' in str(e):
+         return jsonify({"message": "Username already taken."}), 400
+     if 'email' in str(e):
+         return jsonify({"message": "Email already in use."}), 400
+     # You can also log the error details
+     logging.error(f"Error details: {str(e)}")
+     return jsonify({"message": "A database error occurred."}), 500
     finally:
-        print("Closing database connection...")
         connection.close()
 

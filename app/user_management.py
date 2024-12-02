@@ -6,24 +6,21 @@ from pymysql import MySQLError
 import logging
 import os
 import pymysql
-# Define the path to the default profile picture based on the location of this file
+
 DEFAULT_PICTURE_PATH = os.path.join(os.path.dirname(__file__), 'static', 'images', 'default_profile_picture.jpg')
 
 def confirm_user_email(email):
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
-            # Check if the user's email is already confirmed
             cursor.callproc('get_user_by_email', (email,))
             result = cursor.fetchone()
 
             if result:
                 if result['confirmed'] == 1:
-                    # If the email is already confirmed, do nothing
                     logging.info(f"User with email {email} is already confirmed.")
-                    return False  # No need to confirm again
+                    return False  
                 else:
-                    # Update the 'confirmed' field to true for the user
                     update_query = "UPDATE users SET confirmed = 1 WHERE email = %s"
                     cursor.execute(update_query, (email,))
                     connection.commit()
@@ -65,80 +62,60 @@ def upload_profile_picture(user_id, file):
     finally:
         connection.close()
 def change_username(user_id, new_username, current_password):
-    print(f"Starting username change process for user_id: {user_id} to new_username: {new_username}")
     connection = get_db_connection()  
     try:
-        with connection.cursor() as cursor:  # Use dictionary=True for dict-like results
-            # Fetch user info using the stored procedure
-            print(f"Calling stored procedure get_user_by_ID for user_id: {user_id}")
+        with connection.cursor() as cursor:  
             cursor.callproc('get_user_by_ID', (user_id,))
-            user_info = cursor.fetchone()  # Fetch the result of the procedure
-            print(f"Fetched user info: {user_info}")
-
+            user_info = cursor.fetchone()  
             if user_info is None:
                 print("User not found.")
                 return "User not found." 
-            
-            # Extract values from the dictionary
+
             current_username = user_info['username']
             stored_password_hash = user_info['password_hash'] 
-            
-            # Verify current password
-            print(f"Verifying current password for user_id: {user_id}")
+
             if not check_password_hash(stored_password_hash, current_password):
-                print("Current password is incorrect.")
                 return "Current password is incorrect." 
-            
-            # Check if the new username is already taken
-            print(f"Checking if new_username: {new_username} already exists.")
+
             cursor.execute('SELECT username FROM users WHERE username = %s AND user_id != %s', (new_username, user_id))
             existing_user = cursor.fetchone()
-            print(f"Existing user check result: {existing_user}")
 
             if existing_user:
-                print(f"Username '{new_username}' already exists. Cannot update.")
                 return f"Username '{new_username}' already exists. Cannot update."
-            
-            # Update the username
-            print(f"Calling stored procedure UpdateUsername to update username for user_id: {user_id}")
+
             cursor.callproc('UpdateUsername', (user_id, new_username))
             connection.commit()
-            print(f"Username successfully updated for user_id: {user_id} to {new_username}")
+
             return True            
     except Exception as e:
         connection.rollback()
-        print(f"Error occurred while updating username: {e}")
         return f"Error updating username: {e}"  
     finally:
         connection.close()
-        print("Database connection closed.")
 
         
 def change_email(user_id, new_email, current_password):
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
-            
-            print(f"Calling stored procedure get_user_by_ID for user_id: {user_id}")
+
             cursor.callproc('get_user_by_ID', (user_id,))
-            user_info = cursor.fetchone()  # Fetch the result of the procedure
-            print(f"Fetched user info: {user_info}")
+            user_info = cursor.fetchone()
             if user_info is None:
-                return "User not found."  # Return message for clarity
-            current_email = user_info['email']  # Correctly extract the email
-            stored_password_hash = user_info['password_hash']  # Correctly extract the password hash
-            # Verify the provided password against the stored hash
+                return "User not found."  
+            current_email = user_info['email']  
+            stored_password_hash = user_info['password_hash'] 
             if not check_password_hash(stored_password_hash, current_password):
-                return "Current password is incorrect."  # Return message for clarity
+                return "Current password is incorrect." 
             # Validate the new email format
             if not is_valid_email(new_email):
-                return 'Invalid email format.'  # Return message for clarity
+                return 'Invalid email format.' 
             cursor.callproc('UpdateEmail', (user_id, new_email))
             connection.commit()
             return True
     except Exception as e:
         connection.rollback()
-        return f'Error updating email: {e}'  # Return message for clarity
+        return f'Error updating email: {e}' 
     finally:
         connection.close()
 
@@ -146,32 +123,28 @@ def change_phone_number(user_id, new_phone_number, current_password):
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
-            print(f"Calling stored procedure get_user_by_ID for user_id: {user_id}")
             cursor.callproc('get_user_by_ID', (user_id,))
-            user_info = cursor.fetchone()  # Fetch the result of the procedure
-            print(f"Fetched user info: {user_info}")
+            user_info = cursor.fetchone()  
             if user_info is None:
-                return "User not found."  # Return message for clarity
-            current_phone_number = user_info['phone_number']  # Correctly extract the phone_number
-            stored_password_hash = user_info['password_hash']  # Correctly extract the password hash
-            # Verify the provided password against the stored hash
+                return "User not found." 
+            current_phone_number = user_info['phone_number']  
+            stored_password_hash = user_info['password_hash'] 
+
             if not check_password_hash(stored_password_hash, current_password):
-                return "Current password is incorrect."  # Return message for clarity
+                return "Current password is incorrect." 
             cursor.callproc('UpdatePhoneNumber', (user_id, new_phone_number))
             connection.commit()
             return True
     except Exception as e:
         connection.rollback()
-        return f'Error updating Phone Number: {e}'  # Return message for clarity
+        return f'Error updating Phone Number: {e}' 
     finally:
         connection.close()
 
-# Function to change the password
 def change_password(user_id, old_password, new_password):
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
-            print(f"Calling stored procedure get_user_by_ID for user_id: {user_id}")
             cursor.callproc('get_user_by_ID', (user_id,))
             result = cursor.fetchone()
             if not result or not check_password_hash(result['password_hash'], old_password):
@@ -195,11 +168,9 @@ def get_user_by_email(email):
     try:
         with connection.cursor() as cursor:
             cursor.callproc('get_user_by_email', (email,))
-            user = cursor.fetchone()
-            print(user)             
+            user = cursor.fetchone()         
             if user: 
                 new_password = create_new_password()
-                print('new_password',new_password)  
                 hashed_password = generate_password_hash(new_password)
                 cursor.callproc('update_forgotten_password', (email, hashed_password))
                 connection.commit()

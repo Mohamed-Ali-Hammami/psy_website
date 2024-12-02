@@ -5,20 +5,16 @@ from .db_setup import get_db_connection
 import logging
 class TermsOfServiceManager:
     def __init__(self, connection):
-        print("Initializing TermsOfServiceManager with a database connection")
         self.connection = connection
 
     def get_terms_text(self, language: str = 'en') -> Optional[str]:
-        print(f"Retrieving terms text for language: {language}")
         query = "SELECT content FROM terms_and_services WHERE language = %s LIMIT 1"
         try:
             with self.connection.cursor() as cursor:
                 cursor.execute(query, (language,))
                 result = cursor.fetchone()
-                print(f"Retrieved terms text done")
                 return result['content'] if result else None
         except Exception as e:
-            print(f"Error retrieving terms: {e}")
             return None
 
     def update_terms(self, content: str, language: str = 'en') -> Optional[Dict[str, Any]]:
@@ -41,7 +37,6 @@ class TermsOfServiceManager:
             return {'success': False, 'message': 'Error updating terms'}
 
     def create_terms(self, title: str, content: str, language: str = 'en') -> Optional[Dict[str, Any]]:
-        print(f"Creating new terms with title: {title}, language: {language}")
         try:
             with self.connection.cursor() as cursor:
                 cursor.callproc('ManageTermsAndServices', [
@@ -51,15 +46,12 @@ class TermsOfServiceManager:
                 for result_set in cursor.stored_results():
                     result = result_set.fetchone()
                 self.connection.commit()
-                print(f"Creation result: {result}")
                 return result
         except Exception as e:
-            print(f"Error creating terms: {e}")
             self.connection.rollback()
             return None
 
     def search_terms(self, search_term: str) -> Optional[list]:
-        print(f"Searching terms with search term: {search_term}")
         try:
             with self.connection.cursor() as cursor:
                 cursor.callproc('ManageTermsAndServices', [
@@ -68,23 +60,18 @@ class TermsOfServiceManager:
                 results = []
                 for result_set in cursor.stored_results():
                     results = result_set.fetchall()
-                print(f"Search results: {results}")
                 return results
         except Exception as e:
-            print(f"Error searching terms: {e}")
             return None
 def manage_terms():
-    print("Entered manage_terms route")
     try:
         connection = get_db_connection()
-        print("Database connection established")
 
         tos_manager = TermsOfServiceManager(connection)
         
         # Handle GET requests
         if request.method == 'GET':
             action = request.args.get('action', 'text')
-            print(f"GET request with action: {action}")
             if action == 'text':
                 language = request.args.get('language', 'en')
                 terms_text = tos_manager.get_terms_text(language=language)

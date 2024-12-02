@@ -5,7 +5,6 @@ def purchase_product(user_id, product_name, session_id, price):
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
-            # First check if purchase exists
             cursor.execute(
                 "SELECT * FROM purchases WHERE session_id = %s AND product_name = %s",
                 (session_id, product_name)
@@ -14,9 +13,7 @@ def purchase_product(user_id, product_name, session_id, price):
             
             if existing_purchase:
                 print(f"Purchase already recorded for session {session_id}")
-                return True  # Return True since it's already recorded
-                
-            # Insert new purchase including price
+                return True
             cursor.execute(
                 "INSERT INTO purchases (user_id, product_name, session_id, price) VALUES (%s, %s, %s, %s)",
                 (user_id, product_name, session_id, price)
@@ -30,8 +27,6 @@ def purchase_product(user_id, product_name, session_id, price):
     finally:
         connection.close()
 
-
-# Function to get purchases by session ID (for guest users)
 def get_purchases_by_session_id(session_id):
     connection = get_db_connection()
     try:
@@ -51,7 +46,6 @@ def get_purchases_by_session_id(session_id):
         return []
     finally:
         connection.close()
-# Function to get purchases by user ID (for logged-in users)
 def get_purchases_by_user_id(user_id):
     connection = get_db_connection()
     try:

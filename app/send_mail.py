@@ -5,7 +5,6 @@ import os
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
 from flask import logging
-# Load environment variables
 load_dotenv()
 SECRET_KEY = os.getenv('SECRET_KEY')
 def send_contact_email(name: str, email: str, message: str) -> bool:
@@ -13,7 +12,7 @@ def send_contact_email(name: str, email: str, message: str) -> bool:
     sender_password = os.getenv("SENDER_PASSWORD")
     recipient_email = os.getenv("RECIPIENT_EMAIL")
     smtp_server = os.getenv("SMTP_SERVER")
-    smtp_port = int(os.getenv("SMTP_PORT", 587))  # Default to 587 if not set
+    smtp_port = int(os.getenv("SMTP_PORT", 587)) 
 
     try:
         msg = MIMEMultipart()
@@ -53,26 +52,19 @@ def send_password_reset_email(new_password, user_email: str) -> bool:
         print(f"Error sending password reset email: {e}")
         return False
 
-
 def send_confirmation_email(user_email: str, confirm_link: str) -> bool:
-    # Load environment variables
     sender_email = os.getenv("SENDER_EMAIL")
     sender_password = os.getenv("SENDER_PASSWORD")
     smtp_server = os.getenv("SMTP_SERVER")
     smtp_port = int(os.getenv("SMTP_PORT", 587))
-
-    # Check for required environment variables
     if not all([sender_email, sender_password, smtp_server]):
         logging.error("Error: Missing required environment variables.")
         return False
 
-    # Create a URL-safe timed serializer
     serializer = URLSafeTimedSerializer(SECRET_KEY)
     token = serializer.dumps({'email': user_email})
     allowed_origin = os.getenv('ALLOWED_ORIGIN', 'http://localhost:3000')
     confirm_link = f'{allowed_origin}/registration-confirmed/{token}'
-
-    # Prepare the email
     msg = MIMEMultipart()
     msg['From'] = sender_email
     msg['To'] = user_email
@@ -86,10 +78,9 @@ def send_confirmation_email(user_email: str, confirm_link: str) -> bool:
     )
     msg.attach(MIMEText(body, 'plain'))
 
-    # Send the email
     try:
         with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()  # Upgrade the connection to a secure encrypted SSL/TLS connection
+            server.starttls()  
             server.login(sender_email, sender_password)
             server.sendmail(sender_email, user_email, msg.as_string())
         return True

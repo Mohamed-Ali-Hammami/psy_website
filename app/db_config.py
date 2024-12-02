@@ -8,37 +8,21 @@ import base64
 import pymysql
 
 def check_credentials(identifier, password):
-    """
-    Checks credentials for both users and superusers using the CheckCredentials stored procedure.
-    :param identifier: The username or email to check.
-    :param password: The password to check.
-    :return: A dictionary containing user_type and user_id (or superuser_id) or None if invalid.
-    """
-    print(f"Starting credential check for identifier: {identifier}")
     logging.info(f"Checking credentials for identifier: {identifier}")
     
     connection = get_db_connection()
     
     try:
         with connection.cursor() as cursor:
-            # Call the stored procedure
-            print("Calling stored procedure CheckCredentials...")
             cursor.execute("CALL CheckCredentials(%s)", (identifier,))
             result = cursor.fetchone()
-            
-            print(f"Stored procedure result: {result}")
             logging.info(f"Stored procedure result: {result}")
-
-            # Check if a user or superuser was found
             if result:
                 user_type = result.get('user_type')
                 password_hash = result.get('password_hash')
                 user_id = result.get('user_id')
                 superuser_id = result.get('superuser_id')
-               
-                print(f"Retrieved data - User type: {user_type}, User ID: {user_id}, Superuser ID: {superuser_id}")
                 logging.info(f"User type: {user_type}, User ID: {user_id}, Superuser ID: {superuser_id}")
-                print("Validating password...")
                 if user_type == 'user':
                     if user_id is not None and check_password_hash(password_hash,password):
                         return {
@@ -52,20 +36,13 @@ def check_credentials(identifier, password):
                             'superuser_id': superuser_id
                         }
                 elif user_type == 'not_found':
-                    print("User not found.")
                     logging.info("User not found.")
                     return None
                 else:
-                    print(f"Unexpected user type: {user_type}")
                     logging.warning(f"Unexpected user type: {user_type}")
                     return None
-
-                print("Password mismatch.")
                 logging.info("Password mismatch.")
                 return None
-
-            # If no result is returned
-            print("Invalid credentials or user not found.")
             logging.info("Invalid credentials or user not found.")
             return None
 
@@ -110,8 +87,6 @@ def get_users_details(identifier: str):
             '''
             cursor.execute(query, (identifier, identifier, identifier))
             user = cursor.fetchone()
-
-            # Log result or warning if not found
             if user:
                 logging.info(f"User found: {user}")
             else:
@@ -147,7 +122,6 @@ def get_all_users():
             
             users = []
             for user in result:
-                # Convert profile picture to base64 if exists
                 profile_picture_base64 = None
                 if user['profile_picture']:
                     profile_picture_base64 = base64.b64encode(user['profile_picture']).decode('utf-8')

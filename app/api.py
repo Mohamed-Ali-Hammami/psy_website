@@ -18,21 +18,16 @@ import logging
 from .send_mail import send_contact_email,send_password_reset_email,send_confirmation_email
 from itsdangerous import URLSafeTimedSerializer
 import base64
-# Load environment variables
+
 load_dotenv()
 
-# Secret key for encoding and decoding the JWT token
 SECRET_KEY = os.getenv('SECRET_KEY')
 
 app = create_app()
 
-# Initialize Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
 
-
-
-# Route for user registration
 @app.route('/api/create-account', methods=['POST', 'OPTIONS'])
 def register():
     if request.method == 'OPTIONS':
@@ -58,12 +53,10 @@ def terms_of_services():
     Handles fetching terms of service based on query parameters
     """
     try:
-        response = manage_terms()  # Assuming this returns plain text
-        return jsonify(success=True, terms_text=response)  # Wrap the plain text in a JSON response
+        response = manage_terms()
+        return jsonify(success=True, terms_text=response)
     except Exception as e:
         return jsonify(success=False, message=str(e)), 500
-
-# Simplified token generation
 def generate_token(user_id, is_superuser):
     payload = {
         'user_id': user_id,
@@ -71,9 +64,6 @@ def generate_token(user_id, is_superuser):
         'exp': datetime.utcnow() + timedelta(hours=1)
     }
     return jwt.encode(payload, SECRET_KEY, algorithm='HS256')
-
-
-# Token-required decorator
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -89,14 +79,13 @@ def token_required(f):
                 "user_id": payload.get('user_id'),
                 "is_superuser": payload.get('is_superuser', False)
             }
-            # Fetch user details based on user type
             user = (get_superuser_details(current_user['user_id'])
                     if current_user["is_superuser"]
                     else get_users_details(current_user['user_id']))
             if not user:
                 return jsonify({"message": "User not found"}), 404
 
-            current_user.update(user)  # Include fetched user details in `current_user`
+            current_user.update(user) 
         except jwt.ExpiredSignatureError:
             return jsonify({"message": "Token expired, please log in again"}), 401
         except jwt.InvalidTokenError:
@@ -104,10 +93,8 @@ def token_required(f):
         except Exception as e:
             logging.error(f"Token validation error: {e}")
             return jsonify({"message": "Internal server error"}), 500
-        # Pass the current user to the route
         return f(current_user, *args, **kwargs)
     return decorated
-
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json
@@ -131,12 +118,10 @@ def login():
 
     is_superuser = credentials_result['user_type'] == 'superuser'
     token = generate_token(user_id, is_superuser)
-    
-    # Return the token and superuser status
     return jsonify({
         "message": "Login successful!",
         "token": token,
-        "is_superuser": is_superuser  # Return whether the user is a superuser or not
+        "is_superuser": is_superuser
     }), 200
 @app.route('/api/superuser-dashboard', methods=['GET', 'PUT'])
 @token_required
@@ -145,21 +130,14 @@ def superuser_dashboard(current_user):
         return jsonify({"message": "Unauthorized access. Admins only."}), 403
 
     try:
-        # Establish a database connection
         connection = get_db_connection()
         tos_manager = TermsOfServiceManager(connection)
 
         if request.method == 'GET':
-            # Handle GET requests to fetch dashboard data
             all_users = get_all_users()
-            
-            # Prepare detailed dashboard data with purchases
             dashboard_data = []
             for user in all_users:
-                # Fetch purchases for each user
                 purchases = get_purchases_by_user_id(user['user_id'])
-                
-                # Create user data dictionary
                 user_data = {
                     "user_id": user['user_id'], 
                     "first_name": user['first_name'],
@@ -175,12 +153,7 @@ def superuser_dashboard(current_user):
                     "purchases": purchases
                 }
                 dashboard_data.append(user_data)
-            
-            # Fetch Terms of Service text for the dashboard (default to English)
-            terms_text = tos_manager.get_terms_text(language='en')  # Get terms text directly
-            print(terms_text)
-
-            # Prepare dashboard response
+            terms_text = tos_manager.get_terms_text(language='en') 
             response_data = {
                 "users": dashboard_data,
                 "total_users": len(dashboard_data),
@@ -188,18 +161,11 @@ def superuser_dashboard(current_user):
             }
 
             return jsonify(response_data), 200
-
         elif request.method == 'PUT':
-            # Handle PUT requests to update the terms
             data = request.get_json()
-            
-            # Only the content is required for the update
             if 'content' not in data:
                 return jsonify({'success': False, 'message': 'Content is required'}), 400
-
-            # Call the update_terms method, passing only the content
             result = tos_manager.update_terms(content=data['content'], language=data.get('language', 'en'))
-            
             if result['success']:
                 return jsonify({'success': True, 'message': result['message']}), 200
             else:
@@ -209,14 +175,12 @@ def superuser_dashboard(current_user):
         logging.error(f"Error in superuser_dashboard: {e}")
         return jsonify({'message': 'An error occurred.'}), 500
     finally:
-        # Ensure the connection is closed properly
         connection.close()
         logging.info("Database connection closed")
 @app.route('/api/user/details', methods=['GET', 'PUT'])
 @token_required
 def user_details(current_user):
     if request.method == 'GET':
-        # Existing GET logic
         purchases = get_purchases_by_user_id(current_user['user_id'])
         profile_picture_blob = current_user.get('profile_picture')
         profile_picture_base64 = None
@@ -237,12 +201,10 @@ def user_details(current_user):
             "purchases": purchases
         }
         return jsonify(response), 200
-
     elif request.method == 'PUT':
         data = request.json  
         changes_made = False
         errors = []
-        # Handle Profile Picture Update
         profile_picture_base64 = data.get('profilePicture')
         new_username = data.get('username')
         new_email = data.get('email')
@@ -265,32 +227,24 @@ def user_details(current_user):
             except Exception as e:
                 error_message = f"Failed to process profile picture: {str(e)}"
                 errors.append(error_message)
-                
-        # Username change
         if new_username:
             result = change_username(current_user['user_id'], new_username, password)
             if result is True:
                 changes_made = True
             else:
                 errors.append(result)
-
-        # Email change
         if new_email:
             result = change_email(current_user['user_id'], new_email, password)
             if result is True:
                 changes_made = True
             else:
                 errors.append(result)
-
-        # Phone number change
         if new_phone_number:
             result = change_phone_number(current_user['user_id'], new_phone_number, password)
             if result is True:
                 changes_made = True
             else:
                 errors.append(result)
-
-        # Password change
         if old_password and new_password:
             if len(new_password) < 6:
                 errors.append("New password must be at least 6 characters long.")
@@ -298,44 +252,30 @@ def user_details(current_user):
                 errors.append("Failed to update password. Incorrect old password.")
             else:
                 changes_made = True
-
-        # Final response based on changes and errors
         if changes_made:
             return jsonify({"message": "User details updated successfully."}), 200
         elif errors:
             return jsonify({"message": "Errors occurred", "errors": errors}), 400
         else:
             return jsonify({"message": "No changes were made."}), 400
-
-    
 @app.route('/api/send-confirmation-email', methods=['POST'])
 def request_confirmation_email():
-    current_user = request.json  # Assuming you're sending JSON data
+    current_user = request.json  
     user_email = current_user.get('email')
-    
-    # Generate the confirmation URL
-    confirm_link = url_for('confirm_email', token=user_email, _external=True)  # Adjust this as needed
-    
-    # Send the confirmation email
+    confirm_link = url_for('confirm_email', token=user_email, _external=True)
     email_sent = send_confirmation_email(user_email, confirm_link)
     
     if email_sent:
         return jsonify({"message": "Confirmation email sent successfully."}), 200
     else:
         return jsonify({"message": "Failed to send confirmation email."}), 500
-    
-
 @app.route('/api/forgot-password', methods=['POST'])
 def forgot_password():
     data = request.get_json()
-    
-    # Validate input
     if not data or 'email' not in data:
         return {"message": "Email is required"}, 400
     
     email = data['email']
-    
-    # Fetch the user by email and handle potential errors
     new_password = get_user_by_email(email)
     
     if not new_password:
@@ -348,8 +288,6 @@ def forgot_password():
     else:
         return {"message": "Failed to send password reset email"}, 500
 
-
-# Route to confirm the email
 @app.route('/api/confirm-email/<token>', methods=['GET', 'OPTIONS'])
 def confirm_email(token):
     if request.method == 'OPTIONS':
@@ -366,24 +304,19 @@ def confirm_email(token):
             return jsonify({"message": "Email already confirmed or user not found."}), 400
         else:
             return jsonify({"message": "Failed to confirm email."}), 500
-    
     except Exception as e:
         logging.error(f"Error confirming email: {e}")
         return jsonify({"message": "Invalid or expired confirmation link."}), 400
-
-
 @app.route('/api/create-checkout-session', methods=['POST', 'OPTIONS'])
 def create_checkout_session():
     if request.method == 'OPTIONS':
         return make_response('', 200)
-
     data = request.json
     user_id = data.get('user_id')
     cart_items = data.get('cartItems', [])
-    allowed_origin = os.getenv('ALLOWED_ORIGIN', 'http://localhost:3000')  # Make sure you have this in .env
+    allowed_origin = os.getenv('ALLOWED_ORIGIN', 'http://localhost:3000') 
     
     try:
-        # Create Stripe session
         stripe_session = stripe.checkout.Session.create(
             payment_method_types=['card'],
             line_items=[{
@@ -397,19 +330,15 @@ def create_checkout_session():
             mode='payment',
             success_url=f'{allowed_origin}/success?session_id={{CHECKOUT_SESSION_ID}}&items=' +
                         urllib.parse.quote(json.dumps(cart_items)) +
-                        f'&user_id={user_id if user_id else ""}',  # Add user_id to success_url
+                        f'&user_id={user_id if user_id else ""}',  
             cancel_url=f'{allowed_origin}/cancel',
         )
 
         return jsonify({'id': stripe_session.id})
-
     except stripe.error.StripeError as e:
-        # Catch specific Stripe exceptions
         return jsonify(error=str(e)), 400
     except Exception as e:
-        # Catch all other exceptions
         return jsonify(error=f"An error occurred: {str(e)}"), 500
-
 @app.route('/api/record-purchase', methods=['POST'])
 def record_purchase():
     data = request.json
@@ -422,7 +351,6 @@ def record_purchase():
         session = stripe.checkout.Session.retrieve(session_id)
 
         if session.payment_status == 'paid':
-            # Clean up the URL parsing
             success_url = session.success_url
             items_param = success_url.split("items=")[1].split("&user_id=")[0]
             try:
@@ -436,26 +364,20 @@ def record_purchase():
             for item in cart_items:
                 product_name = item.get('product_name')
                 price = item.get('amount')
-
-                # Call purchase_product to save the purchase in the database
                 if purchase_product(user_id, product_name, session_id,price):
                     successful_purchases.append(product_name)
                 else:
                     failed_purchases.append(product_name)
-
-            # After successfully recording the purchases, retrieve them based on session_id or user_id
             if user_id:
-                # Query purchases by user_id if the user is logged in
                 purchases = get_purchases_by_user_id(user_id)
             else:
-                # Query purchases by session_id for guest users
                 purchases = get_purchases_by_session_id(session_id)
 
             response = {
                 "message": "Purchase recording completed",
                 "successful_purchases": successful_purchases,
                 "failed_purchases": failed_purchases,
-                "purchases": purchases  # Include the retrieved purchases in the response
+                "purchases": purchases 
             }
 
             if failed_purchases:
@@ -465,13 +387,11 @@ def record_purchase():
             return jsonify({"message": "Payment not successful."}), 400
     except Exception as e:
         return jsonify(error=str(e)), 400
-
 @app.route('/api/contact-us', methods=['POST', 'OPTIONS'])
 def contact_us():
     if request.method == 'OPTIONS':
         return make_response('', 200)
 
-    # Get the JSON data from the request
     data = request.get_json()
     if not data:
         return jsonify({"message": "No input data provided."}), 400
@@ -480,26 +400,20 @@ def contact_us():
     email = data.get('email')
     message = data.get('message')
 
-    # Check for required fields
     if not name or not email or not message:
         return jsonify({"message": "Name, email, and message are required."}), 400
 
-    # Send the email using the send_contact_email function
     email_sent = send_contact_email(name, email, message)
     if email_sent:
         return jsonify({"message": "Your message has been sent successfully!"}), 200
     else:
         return jsonify({"message": "Failed to send your message. Please try again later."}), 500
-
-
-# Logout route
 @app.route('/api/logout', methods=['POST'])
 def logout():
     logout_user()
     session.clear()
     return jsonify({"message": "Logged out successfully!"}), 200
 
-# Run the application
 if __name__ == '__main__':
     with app.app_context():
         app.run(debug=True, host='127.0.0.1', port=5000)

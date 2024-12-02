@@ -2,8 +2,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from .db_setup import get_db_connection
 from .self_utils import is_valid_email,create_new_password
 from flask import flash, jsonify
-from mysql.connector import Error as MySQLError
-from mysql.connector import errorcode
+from pymysql import MySQLError
 import logging
 import os
 import pymysql
@@ -207,10 +206,9 @@ def get_user_by_email(email):
                 return user,new_password
     finally:
         connection.close()
-
-
+     # Helper function to register user using the RegisterUser stored procedure
 def register_user(first_name, last_name, username, email, password, phone_number, country, address, profile_picture=None):
-    # Initial validations (keep existing checks)
+    # Initial validations
     if not first_name or not last_name or not username or not email or not password or not phone_number or not country:
         return jsonify({"message": "All fields are required."}), 400
 
@@ -222,7 +220,7 @@ def register_user(first_name, last_name, username, email, password, phone_number
 
     hashed_password = generate_password_hash(password)
 
-    # Profile picture handling (keep existing logic)
+    # Profile picture handling
     if profile_picture is None:
         if os.path.exists(DEFAULT_PICTURE_PATH):
             with open(DEFAULT_PICTURE_PATH, 'rb') as image_file:
@@ -230,22 +228,19 @@ def register_user(first_name, last_name, username, email, password, phone_number
         else:
             return jsonify({"message": "Default profile picture file not found."}), 500
 
+    
     connection = get_db_connection()
+
     try:
         with connection.cursor() as cursor:
             try:
-                # Call the stored procedure
                 cursor.callproc('RegisterUser', (
                     first_name, last_name, username, email, hashed_password,
                     profile_picture, phone_number, country, address
                 ))
 
-                # Fetch any result (if the procedure returns anything)
-                results = list(cursor.stored_results())
-                
-                # Commit the transaction
+                # Commit the changes
                 connection.commit()
-
                 return jsonify({
                     "message": "User registered successfully!", 
                     "user": {
@@ -257,32 +252,21 @@ def register_user(first_name, last_name, username, email, password, phone_number
                 }), 201
 
             except MySQLError as mysql_err:
-                # Rollback the transaction
-                connection.rollback()
 
-                # Handle specific MySQL error codes
-                if mysql_err.errno == errorcode.ER_DUP_ENTRY:
-                    # Check which unique constraint was violated
-                    error_message = str(mysql_err)
-                    if 'username' in error_message:
-                        return jsonify({"message": "Username already taken."}), 400
-                    elif 'email' in error_message:
-                        return jsonify({"message": "Email already in use."}), 400
+                # Extract and return specific error messages from the stored procedure
+                if mysql_err.args[0] == 1644:  # Error signal from the stored procedure
+                    error_message = mysql_err.args[1]
+                    if "The provided username is already taken" in error_message:
+                        return jsonify({"message": "The provided username is already taken. Please choose a different one."}), 400
+                    elif "The provided email is already in use" in error_message:
+                        return jsonify({"message": "The provided email is already in use. Please use a different email address."}), 400
 
-                # Handle signal errors from the stored procedure
-                if mysql_err.errno == 1644:  # Custom error number for SIGNAL statements
-                    return jsonify({"message": mysql_err.msg}), 400
-
-                # Log the full error for debugging
+                # Log and return a general database error message
                 logging.error(f"MySQL Error: {mysql_err}")
                 return jsonify({"message": "An unexpected database error occurred."}), 500
 
     except Exception as e:
-        # Catch any other unexpected errors
         logging.error(f"Unexpected error: {e}")
         return jsonify({"message": "An unexpected error occurred."}), 500
-
     finally:
-        # Ensure connection is always closed
-        if connection:
-            connection.close()
+        connection.close()

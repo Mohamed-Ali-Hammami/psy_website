@@ -1,6 +1,6 @@
 from werkzeug.security import generate_password_hash, check_password_hash
 from db_setup import get_db_connection
-from self_utils import is_valid_email,create_new_password
+from .self_utils import is_valid_email,create_new_password
 from flask import flash, jsonify
 from pymysql import MySQLError
 import logging

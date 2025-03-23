@@ -8,14 +8,14 @@ import json
 import jwt
 from datetime import datetime, timedelta
 import stripe
-from .db_setup import create_app,get_db_connection
-from .db_config import (get_all_users,check_credentials,get_superuser_details,get_users_details)
-from .user_management import (confirm_user_email, change_username, change_email,change_phone_number,
+from db_setup import create_app,get_db_connection
+from db_config import (get_all_users,check_credentials,get_superuser_details,get_users_details)
+from user_management import (confirm_user_email, change_username, change_email,change_phone_number,
     change_password, register_user,get_user_by_email, upload_profile_picture)
-from .purchase_management import get_purchases_by_session_id , get_purchases_by_user_id,purchase_product
-from .terms_of_service import TermsOfServiceManager,manage_terms
+from purchase_management import get_purchases_by_session_id , get_purchases_by_user_id,purchase_product
+from terms_of_service import TermsOfServiceManager,manage_terms
 import logging
-from .send_mail import send_contact_email,send_password_reset_email,send_confirmation_email
+from send_mail import send_contact_email,send_password_reset_email,send_confirmation_email
 from itsdangerous import URLSafeTimedSerializer
 import base64
 
